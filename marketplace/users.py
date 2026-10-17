@@ -30,6 +30,8 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
                                                             it inherits directly from the python dict, it is also efficiently implemented using C.
 
                                                              Θ(1) for Insertion, Deletion and Lookup.
+                                                             Θ(n) if collision or expansion needed.
+                                                             Generally grabbing an item is instantaneous Θ(n)
     """
     """Klasse zur Verwaltung aller registrierten Benutzer und ihrer Freundschaften.
 

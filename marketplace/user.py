@@ -1,4 +1,4 @@
-"""Übersicht über den Dateiinhalt:
++"""Übersicht über den Dateiinhalt:
 
 Diese Datei definiert die Klasse User.
 Ein User repräsentiert einen Teilnehmer am Marktplatz (Käufer und Verkäufer).

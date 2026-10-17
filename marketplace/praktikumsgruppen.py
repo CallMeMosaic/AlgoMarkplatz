@@ -10,12 +10,13 @@ Union, Find mit Pfadkomprimierung).
 # Definiert die Klassen Praktikumsgruppen und SetNode, implementiert als Menge von disjunkten Mengen (Praktikum 3) oder als Dictionary (Praktikum 1 und 2)
 #
 from typing import Any, List, Optional, Union
+import warnings
 
 
 class SetNode:
     """Klasse zur Repräsentation eines Knotens in einer Disjoint-Set-Struktur (Union-Find).
 
-    Attributes:
+    Attributes:+
         _parent (SetNode): Zeiger auf den Eltern-Knoten (self bei Wurzeln).
         _weight (int): Anzahl der Knoten im Teilbaum.
     """
@@ -33,7 +34,32 @@ class SetNode:
         Raises:
             None
         """
-        # TODO for students (Praktikum 1): ergänzen Sie hier die private Membervariable _praktikumsgruppe
+
+        # Creates the private variable _praktikumsgruppe (which is an int as declared at the very bottom of users.py get_from_cvs method
+        self._praktikumsgruppe: Optional[int] = None # Saves the groupnumber assigned to this node.
+
+        def get_praktikumsgruppe(self) -> Optional[int]:
+            """
+            custom getter for the _praktikumsgruppe private variable.
+
+            :param self: Needed to access the variable
+            :return: Returns an int if the variable has a value, otherwise it returns None.
+            """
+
+            return self._praktikumsgruppe
+
+
+        def set_praktikumsgruppe(self, groupnum: int) -> None:
+            """
+            custom setter for the private variable _praktikumsgruppe.
+            Needed to change it's value later on, as a Node shouldn't have to have on upon initialization (As far as I understand)
+
+            :param self: Needed to access the variable itself.
+            :param groupnum: The Integer number which the _praktikumsgruppe variable will be set to
+            :return: None because it is a setter
+            """
+
+            self._praktikumsgruppe = groupnum
 
         # TODO: werden nur für Praktikum 3 benötigt
         self._parent: SetNode = self   # parent Knoten des SetNode Objekts. self bedeutet, dass der Knoten ein Wurzelknoten ist
@@ -58,6 +84,8 @@ class Praktikumsgruppen(dict):
                                                             it inherits directly from the python dict, it is also efficiently implemented using C.
 
                                                              Θ(1) for Insertion, Deletion and Lookup.
+                                                             Θ(n) if collision or expansion needed.
+                                                             Generally grabbing an item is instantaneous Θ(n)
 
     """
 
@@ -114,37 +142,105 @@ class Praktikumsgruppen(dict):
         return user_id
 
     def create_groups(self, user_ids: List[str], groupnumbers: List[int]) -> None:
-        """Erstellt Praktikumsgruppen aus Benutzer-IDs und Gruppennummern.
-
-        Args:
-            user_ids (List[str]): Liste von Benutzer-IDs.
-            groupnumbers (List[int]): Zuordnende Gruppennummern.
-
-        Returns:
-            None
-
-        Raises:
-            None
         """
-        # TODO: implement in Praktikum 1
-        pass
+        This method iterates through two lists user_ids and groupnumbers, which should be of identical size.
+        The lists are intended to be generated from a CSV file using the method _read_users_from_csvfile() method from users.py.
+        If this is true, the elements in both lists correspond to the same user and therefore the lists can be iterated through
+        simultaneously without any checks.
+
+        The result of this method's execution is, that each user gets assigned their corresponding group according using the
+        variable's custom setter method.
+
+        :param: user_ids
+        :type: List[str]
+        :description: This list would be each user's id. The list should be generated from the above stated method.
+
+        :param: groupnumbers
+        :type: List[int]
+        :description: This list would be each user's group's number. This list should be generated from the above stated method.
+
+
+        :return: None
+
+        :raises: Raises a warning when the user is not in the dictionary (Should never happen)
+
+        Docstring edited by CallMeMosaic
+        """
+
+
+        for user, groupnum in zip(user_ids, groupnumbers):
+
+            # Zip is used in this case, as the read_from_csv method creates lists of identical size from a CSV file
+            # This means that each element in one of those lists, corresponds to an item at the same index of any other of those lists
+            # Due to this the zip() method is used to create one iterable list of sets to iterate through.
+            if user in self:
+
+                # Mit self[user] wird das Objekt angesprochen
+                self[user].set_praktikumsgruppe(groupnum)
+
+            else:
+                warnings.warn("User is not in underlying dictionary. THIS SHOULD NOT BE HAPPENING!")
+
 
     # *** PUBLIC GET methods ***
 
     def get_groupmembers(self, user_id: str) -> List[str]:
-        """Gibt eine Liste aller Gruppenmitglieder der Gruppe des Benutzers zurück.
-
-        Args:
-            user_id (str): Benutzer-ID.
-
-        Returns:
-            List[str]: Liste von Benutzer-IDs der Gruppenmitglieder.
-
-        Raises:
-            KeyError: Falls `user_id` nicht im Wörterbuch existiert.
         """
-        # TODO: implement in Praktikum 1
-        pass
+        Searches for all users with the same group_id as the user_id handed in parameter and returns a list of all of them.
+        Also makes sure that user_id is according to the hinted type.
+
+        :param: user_id
+        :type: String
+        :description: The ID of the user whose group to find.
+
+        :return: List[str] / Empty List
+        :description: Returns a List of all users in the user's group or an empty list if the user has no group/ is alone in a group.
+
+        :raises: KeyError if the user_id is not in the dict
+        :raises: TypeError if the wrong type was entered for user_id
+
+        Runtime:
+        Θ(n) as the entire dictionary is iterated through once.
+        Ω(1) as it can happen that the user is not found or has no group, which reults in outputting nothing.+++++++++++++++++^^
+
+        Docstring edited by CallMeMosaic
+        """
+
+        # Check if the user is even in the dictionary
+
+        if user_id not in self:
+            raise KeyError(f"User {user_id} is not item of underlying dict!")
+
+
+        # Make sure the entered variable is according to type hint
+
+        if isinstance(user_id, String) or user_id is None:
+            raise TypeError(f"Parameter type missmatch. Expected type was 'String' got: {type(user_id)}!")
+
+
+        # Assign the group's id of the targeted user to a temporary variable
+
+        targeted_group = self[user_id].get_praktikumsgruppe()
+
+        if targeted_group is None:
+            print("User has no Praktikumsgruppe")
+            return []
+
+
+        # Iterate through the users of the dict and add all users user_id with the same group to the list
+
+        group_members = []
+
+        for id, user_object in self.items():
+            # usage of self.items() here so that the object to iterate through contains the key-value-pairs of the dict
+            # instead of just the keys, as it would be when iterating through self.
+
+            if user_object.get_praktikumsgruppe() == targeted_group:
+
+                group_members.append(id)
+
+        return group_members
+
 
     def print_ds(self) -> None:
         """Gibt die Disjoint-Set-Struktur aus.
