@@ -11,7 +11,13 @@ from typing import List
 
 @dataclass(frozen=True)
 class Transaction:
-    """Dataclass zur Repräsentation einer durchgeführten Verkaufstransaktion.
+    """
+    Transaction implements a HashTable as a List of Lists.
+    Since it uses standard Python lists, which are mutable and dynamic in size per default.
+    Due to how Lists in Python are implemented, all operations (except printing all elements or searching through it) are
+    Θ(1), as they can be accessed instantaneously. Same goes for adding items to the "slots" or "buckets", these expand
+    dynamically with the amount of data stored in them (initially they are empty). Adding items to these lists is also always
+    Θ(1). The size of the HashTable is given as a parameter by the user or defaults to 128.
 
     Attributes:
         seller (str): Name des Verkäufers.
@@ -142,23 +148,35 @@ class Transactions:
 
     # *** PRIVATE METHODS ***
 
-    # TODO: Erstellt eine bessere Hashfunktion, welche möglichst wenig Kollisionen generiert
     def _hash_fn(self, tx: Transaction) -> int:
-        """Hashfunktion zur Bestimmung des Bucket-Index einer Transaktion.
-
-        Args:
-            tx (Transaction): Die Transaktion.
-
-        Returns:
-            int: Der berechnete Bucket-Index.
-
-        Raises:
-            None
         """
-        # Deliberately bad key function:
-        # Use ONLY the first character of the product name.
-        if not tx.product_name:
-            return 0
-        first = tx.product_name[0].lower()
-        # Map 'a'..'z' to 0..25, everything else also squeezed into the table
-        return (ord(first) - ord('a')) % self._capacity
+        Original Hashfunction:
+            First checks if the transaction even has a product name, if that is not the case, the transaction is not
+            valid and gets rejected (return 0).
+            The HashTable itself is implemented as a List of Lists.
+            The normal Hashfunction only looks at the first letter of the key, converts it to a lowercase letter.
+            Since the lowercase letters map directly to the indicies 0 to 25 (standard english letters), in most cases
+            only the first 25 buckets will be utilized and the rest of the table will stay empty, therefore wasting storage
+            and causing a massive clustering.
+
+        New Hashfunction:
+            This function will take into account the entire name of the transaction and it's timestamp, and convert
+            it to a number value using Python's build in hash() function.
+            This approach is chosen, since the alternative (only name or timestamp) could result in clustering and
+            doing both using ord() would result in unoptimized Θ(k+h) time complexity, where k ist the length of the
+            product name and h ist the length of the timestamp. This is rather unoptimal and since Pythong's hash function is
+            written in C and optimized to run efficiently, it will be used here.
+            Then the function multiplies a prime number (7) in order to shift it reliably and then use the modulo of capacity to give it a designated index.
+
+
+        :param tx:
+        :return:
+        """
+
+
+        # Creates a Tuple object that the hash function can hash, since both variables have different types, adding them would result in a TypeError :c
+        init_hash = hash((tx.product_name, tx.timestamp))
+        return (init_hash * 7) % self._capacity
+
+
+

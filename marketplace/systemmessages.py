@@ -18,6 +18,19 @@ from typing import Any, Callable, Optional
 
 
 class SystemMessages:
+    """
+    Comment by me:
+
+    The Class system messages implements a queue of messages (Strings) by using the datastructure ArrayList.
+    As this is a queue, only the most upper element should be accessed, but since this is python, each element of the
+    ArrayList can be accessed.
+    Accessing, Inserting or Deleting an Element are O(1) as the underlying datastrcture is an array.
+    If the Array has to be extended, the runtime should be O(n).
+    A Queue is valid here, since only the most recent system message needs to be displayed at any time.
+
+    """
+
+
     """Verwaltet Benachrichtigungsmeldungen des Systems über Callbacks oder Tkinter-Widgets.
 
     Attributes:
@@ -30,8 +43,8 @@ class SystemMessages:
 
     # *** CONSTRUCTORS ***
     def __init__(self, target: Optional[Any] = None,
-                 update_callback: Optional[Callable[[str, str], None]] = None,
-                 after_callback: Optional[Callable[[int, Callable], None]] = None) -> None:
+                 update_callback: Optional[Callable[[str, str], None]] = None, # Invalid?
+                 after_callback: Optional[Callable[[int, Callable], None]] = None) -> None: # Invalid?
         """Initialisiert die SystemMessages-Klasse.
 
         Args:
