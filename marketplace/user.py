@@ -1,4 +1,4 @@
-+"""Übersicht über den Dateiinhalt:
+"""Übersicht über den Dateiinhalt:
 
 Diese Datei definiert die Klasse User.
 Ein User repräsentiert einen Teilnehmer am Marktplatz (Käufer und Verkäufer).
@@ -27,6 +27,27 @@ import marketplace.praktikumsgruppen
 
 
 class User(marketplace.praktikumsgruppen.SetNode):
+    """
+    A user object, which directly interhits from the SetNode class, therefore making it a Node object with the following
+    attributes.
+
+    :param _id: The user's ID.
+    :param _password: The user's password.
+    :param _name_first: The user's first name.
+    :param _name_family: The user's last name.
+    :param _friends: A set of user IDs of friends.
+    :param _balance: The user's balance in Euro.
+    :param: _gps_coords: The user's GPS coordinates.
+    :param: _address: The user's address.
+    :param: _rating_stars: The user's rating stars.
+    :property: _praktikumsgrupe: Inherited from superclass SetNode.
+
+
+    """
+
+
+
+
     """Klasse zur Repräsentation eines Benutzers auf dem Marktplatz.
 
     Attributes:

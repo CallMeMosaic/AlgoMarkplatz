@@ -38,7 +38,7 @@ class SetNode:
         # Creates the private variable _praktikumsgruppe (which is an int as declared at the very bottom of users.py get_from_cvs method
         self._praktikumsgruppe: Optional[int] = None # Saves the groupnumber assigned to this node.
 
-        def get_praktikumsgruppe(self) -> Optional[int]:
+    def get_praktikumsgruppe(self) -> Optional[int]:
             """
             custom getter for the _praktikumsgruppe private variable.
 
@@ -49,7 +49,7 @@ class SetNode:
             return self._praktikumsgruppe
 
 
-        def set_praktikumsgruppe(self, groupnum: int) -> None:
+    def set_praktikumsgruppe(self, groupnum: int) -> None:
             """
             custom setter for the private variable _praktikumsgruppe.
             Needed to change it's value later on, as a Node shouldn't have to have on upon initialization (As far as I understand)
@@ -61,9 +61,10 @@ class SetNode:
 
             self._praktikumsgruppe = groupnum
 
-        # TODO: werden nur für Praktikum 3 benötigt
-        self._parent: SetNode = self   # parent Knoten des SetNode Objekts. self bedeutet, dass der Knoten ein Wurzelknoten ist
-        self._weight: int = 1      # Gewicht (Anzahl Knoten) des (Teil-)Baumes, der in dem SetNode Objekt verwurzelt ist
+            # TODO: werden nur für Praktikum 3 benötigt
+            self._parent: SetNode = self   # parent Knoten des SetNode Objekts. self bedeutet, dass der Knoten ein Wurzelknoten ist
+            self._weight: int = 1      # Gewicht (Anzahl Knoten) des (Teil-)Baumes, der in dem SetNode Objekt verwurzelt ist
+
         # Alternative: Rank-based Quick Union
         # self._rank = 0
 
@@ -168,15 +169,17 @@ class Praktikumsgruppen(dict):
         """
 
 
-        for user, groupnum in zip(user_ids, groupnumbers):
+
+        for u, groupnum in zip(user_ids, groupnumbers):
 
             # Zip is used in this case, as the read_from_csv method creates lists of identical size from a CSV file
             # This means that each element in one of those lists, corresponds to an item at the same index of any other of those lists
             # Due to this the zip() method is used to create one iterable list of sets to iterate through.
-            if user in self:
+            if u in self:
 
-                # Mit self[user] wird das Objekt angesprochen
-                self[user].set_praktikumsgruppe(groupnum)
+
+                self[u].set_praktikumsgruppe(groupnum)
+
 
             else:
                 warnings.warn("User is not in underlying dictionary. THIS SHOULD NOT BE HAPPENING!")
