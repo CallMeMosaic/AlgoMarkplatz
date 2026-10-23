@@ -1254,8 +1254,7 @@ class AuctionAppInit:
         Returns:
             None
         """
-        # TODO for students (Praktikum 1): fügen Sie auch die Nutzer-IDs in den Trie ein, damit im Suchfeld
-        # auch nach Nutzer-IDs gesucht werden kann
+
         product_names = self._auctions.get_all_item_names()
         user_ids = list(self._users.keys())  #NEU_P1_Nr2: Nutzer-IDs abrufen
         counter = Counter(product_names)
