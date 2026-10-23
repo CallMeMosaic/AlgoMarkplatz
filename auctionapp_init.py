@@ -39,6 +39,7 @@ import marketplace.auction
 import marketplace.systemmessages
 import marketplace.avl_tree
 from marketplace import avl_tree
+import time
 
 
 class ToolTip:
@@ -990,23 +991,27 @@ class AuctionAppInit:
             print('place_bid fails: ', bid_amount, selected, is_all_items_listbox, value)
 
     def show_suggestions(self, event: tk.Event) -> None:
-        """Zeigt Autovervollständigungsvorschläge für das Suchfeld an.
 
-        Args:
-            event (tk.Event): Das Tastatur-Event.
-
-        Returns:
-            None
-        """
         search_text = self.search_entry.get()
         if search_text:
-            suggestions = self.trie.search(search_text)
-            # TODO for students (Praktikum 1): nutzen Sie hier die Vorschläge des AVL-Baums und vergleichen Sie
-            #  die Laufzeit mit der des Tries
-            # avl_suggestions = self.avl_tree.find_most_likely_words(search_text)
-            self.show_tooltip(suggestions)
+           #NEU_P1_Nr2: Laufzeit der Trie-Suche messen
+           start_trie = time.perf_counter()
+           suggestions = self.trie.search(search_text)
+           trie_time = time.perf_counter() - start_trie
+
+           #NEU_P1_Nr2: Laufzeit der AVL-Baum-Suche messen
+           start_avl = time.perf_counter()
+           avl_suggestions = self.avl_tree.find_most_likely_words(search_text)
+           avl_time = time.perf_counter() - start_avl
+
+           #NEU_P1_Nr2: Laufzeiten beider Suchmethoden ausgeben
+           print(f"Trie-Suche: {trie_time:.6f} Sekunden")
+           print(f"AVL-Baum-Suche: {avl_time:.6f} Sekunden")
+
+           #NEU_P1_Nr2: Vorschläge weiterhin aus dem Trie anzeigen
+           self.show_tooltip(avl_suggestions)
         else:
-            self.hide_tooltip()
+           self.hide_tooltip()
 
     def on_select(self, event: tk.Event) -> None:
         """Übernimmt den in der Vorschlagsliste ausgewählten Begriff in das Suchfeld.
@@ -1252,13 +1257,15 @@ class AuctionAppInit:
         # TODO for students (Praktikum 1): fügen Sie auch die Nutzer-IDs in den Trie ein, damit im Suchfeld
         #  auch nach Nutzer-IDs gesucht werden kann
         product_names = self._auctions.get_all_item_names()
-
+        user_ids = list(self._users.keys())  #NEU_P1_Nr2: Nutzer-IDs abrufen
         counter = Counter(product_names)
         tuple_list = list(counter.items())
 
         for product_name, count in tuple_list:
             self.trie.insert(product_name)
             self.avl_tree.insert(product_name, count)
+        for user_id in user_ids:  #NEU_P1_Nr2: Nutzer-IDs in den Trie einfügen
+            self.trie.insert(str(user_id))
 
     def rebuild_trie(self) -> None:
         """Baut Trie und AVL-Baum neu auf, damit auch neu erstellte Auktionen vorgeschlagen werden.
