@@ -12,6 +12,8 @@ Union, Find mit Pfadkomprimierung).
 from typing import Any, List, Optional, Union
 import warnings
 
+from narwhals import String
+
 
 class SetNode:
     """Klasse zur Repräsentation eines Knotens in einer Disjoint-Set-Struktur (Union-Find).
@@ -204,7 +206,7 @@ class Praktikumsgruppen(dict):
 
         Runtime:
         Θ(n) as the entire dictionary is iterated through once.
-        Ω(1) as it can happen that the user is not found or has no group, which reults in outputting nothing.+++++++++++++++++^^
+        Ω(1) as it can happen that the user is not found or has no group, which results in outputting nothing.+++++++++++++++++^^
 
         Docstring edited by CallMeMosaic
         """

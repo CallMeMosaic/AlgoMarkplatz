@@ -164,7 +164,7 @@ class Transactions:
             it to a number value using Python's build in hash() function.
             This approach is chosen, since the alternative (only name or timestamp) could result in clustering and
             doing both using ord() would result in unoptimized Θ(k+h) time complexity, where k ist the length of the
-            product name and h ist the length of the timestamp. This is rather unoptimal and since Pythong's hash function is
+            product name and h is the length of the timestamp. This is rather unoptimal and since Pythong's hash function is
             written in C and optimized to run efficiently, it will be used here.
             Then the function multiplies a prime number (7) in order to shift it reliably and then use the modulo of capacity to give it a designated index.
 

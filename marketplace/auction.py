@@ -61,7 +61,7 @@ class Auction:
         # currently bidding on similar products
         self._recommended2users: Set[str] = set()
 
-        # use a heap to add a new customer with its bid (heapq implements a min heap)
+        # use a heap to add a new customer with its bid (heap implements a min heap)
         self._users_bidding: List[Tuple[float, str]] = []
 
         # bids of all users on this auction in the order in which they were done. the last bid

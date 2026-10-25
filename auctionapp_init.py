@@ -991,8 +991,8 @@ class AuctionAppInit:
             print('place_bid fails: ', bid_amount, selected, is_all_items_listbox, value)
 
     def show_suggestions(self, event: tk.Event) -> None:
-
         search_text = self.search_entry.get()
+        print(f"{search_text}:")
         if search_text:
            #NEU_P1_Nr2: Laufzeit der Trie-Suche messen
            start_trie = time.perf_counter()
