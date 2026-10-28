@@ -27,7 +27,6 @@ import csv
 # AVL Baum speichern und je nachdem ob preissegment-filter in gui genutzt wird (müsste noch hinzugefügt
 # werden zu gui), nutzt man entweder AVL-Baum oder Hashtabelle.
 class Auctions(dict):
-
     # COMMENTS BY ME
     """
     Same thing here, this class inherits from dict, which is pythons own implementation of the ADT dictionary.
@@ -44,7 +43,6 @@ class Auctions(dict):
     Whabam that's all items.
 
     """
-
 
     """Klasse zur Verwaltung des Wörterbuchs aller Auktionen.
 
@@ -80,18 +78,21 @@ class Auctions(dict):
         except NotImplementedError:
             self._heap = None
 
-        # TODO for students: für 2. Praktikum: erstelle hier ein MaxHeap, um den besten User/Verkäufer mit der Methode
-        #  get_top_rated_user() (s.u.) in konstanter Zeit zurück geben zu können. auf der GUI gibt es noch keinen Button
-        #  mit dem Sie andere Nutzer bewerten können. das wird alles simuliert in simulator.py. Sie können von jedem
-        #  User über die Methode user.User.get_rating_stars_mean() die mittlere Anzahl Sterne abfragen.
-        #  Nach jeder Bewertung muss die Datenstruktur aktualisiert werden, s. simulator.Simulator.randomly_rate_users().
-        self._heap_users_rated: Optional[Any] = None
+        # Max-Heap der Benutzer: "bid_count" ist hier die mittlere Sternebewertung (get_rating_stars_mean()),
+        # "auction_id" ist die User-ID. Damit liefert get_top_rated_user() den bestbewerteten Verkäufer in O(1).
+        # Gefüllt wird der Heap, sobald die Benutzer geladen sind (s.u.), und nach jeder simulierten Bewertung
+        # über _update_user_rating() aktualisiert.
+        self._heap_users_rated: Optional[MaxHeap] = MaxHeap()
 
         # 1024 Buckets: in 30 Minuten entstehen einige hundert Transaktionen. Bei nur 128 Buckets wären ab der
         # 129. Transaktion Kollisionen unvermeidbar und der Effekt einer besseren Hashfunktion kaum sichtbar.
         self._transactions: Transactions = Transactions(1024)
 
         self._users: marketplace.users.Users = marketplace.users.Users("user.csv")
+
+        # alle Benutzer mit ihrer aktuellen mittleren Sternebewertung in den Heap einfügen: O(n log n) einmalig
+        for user_id in list(self._users.keys()):
+            self._update_user_rating(user_id)
 
         self._read_auctions_from_csvfile(csvfile)
 
@@ -122,7 +123,8 @@ class Auctions(dict):
 
     # *** PUBLIC methods ***
 
-    def add_new_auction(self, user_id: str, item_name: str, description: str = "", value_min: float = 1.0) -> marketplace.auction.Auction:
+    def add_new_auction(self, user_id: str, item_name: str, description: str = "",
+                        value_min: float = 1.0) -> marketplace.auction.Auction:
         """Erstellt eine neue Auktion und fügt sie dem Wörterbuch hinzu.
 
         Args:
@@ -646,7 +648,6 @@ class Auctions(dict):
             res = self._heap.get_auction_with_max_bidders()
             return res[1] if res else None
 
-    # TODO for students: in 2. Praktikum: nutze diese Methode und passe diese evtl. an
     def get_top_rated_user(self, with_num_stars: bool = False) -> Optional[Union[List[Any], str]]:
         """Gibt den am besten bewerteten Benutzer zurück.
 
@@ -659,28 +660,34 @@ class Auctions(dict):
         Raises:
             None
         """
-        # TODO for students: do not use this part
-        # stupid brute force implementation
-        max_user: Optional[str] = None
-        max_stars: float = 0.0
-        for user_id, user in self._users.items():
-            stars_mean = user.get_rating_stars_mean()
-            if stars_mean > max_stars:
-                max_stars = stars_mean
-                max_user = user_id
+        # do not use this part
+        # stupid brute force implementation --> O(n)
+        # max_user: Optional[str] = None
+        # max_stars: float = 0.0
+        # for user_id, user in self._users.items():
+        #     stars_mean = user.get_rating_stars_mean()
+        #     if stars_mean > max_stars:
+        #         max_stars = stars_mean
+        #         max_user = user_id
+        #
+        # if with_num_stars:
+        #     return [max_stars, max_user]
+        # else:
+        #     return max_user
 
+        # Max-Heap-Lösung: Zugriff auf die Wurzel in O(1) statt O(n) wie bei der Brute-Force-Variante
+        if self._heap_users_rated is None:
+            return None
+
+        top = self._heap_users_rated.get_auction_with_max_bidders()  # (mean_stars, user_id) oder None
+        if top is None:
+            return None
+
+        max_stars, max_user = top
         if with_num_stars:
             return [max_stars, max_user]
         else:
             return max_user
-
-        # TODO for students: instead use and probably change this
-        # if not self._heap_users_rated:
-        #     return None
-        # if with_num_stars:
-        #     return self._heap_users_rated.get_top_user()
-        # else:
-        #     return self._heap_users_rated.get_top_user()[1]
 
     def get_active_auctions(self) -> Dict[str, marketplace.auction.Auction]:
         """Gibt alle nicht abgewickelten/nicht verkauften Auktionen zurück.
@@ -801,6 +808,30 @@ class Auctions(dict):
                     print('Letzte Auktion kam von Nutzer {0}, das steht auch im Stapel: {1}'.format(
                         random_user, self.get_last_bid(random_auction)))
 
+    def _update_user_rating(self, user_id: str) -> None:
+        """Aktualisiert die mittlere Sternebewertung eines Benutzers im Max-Heap der bewerteten Benutzer.
+
+        Fügt den Benutzer ein, falls er noch nicht im Heap ist, sonst wird sein Eintrag angepasst. O(log n).
+
+        Args:
+            user_id (str): Benutzer-ID.
+
+        Returns:
+            None
+
+        Raises:
+            KeyError: Wenn die `user_id` nicht in den Benutzern existiert.
+        """
+        if self._heap_users_rated is None:
+            return
+
+        stars_mean = self._users[user_id].get_rating_stars_mean()
+
+        if self._heap_users_rated.get_auction_bidders(user_id) is None:
+            self._heap_users_rated.add_auction(user_id, stars_mean)
+        else:
+            self._heap_users_rated.update_bidders(user_id, stars_mean)
+
     def _start_simulator(self, current_user_id: str, elapsed_seconds: int = 0, max_duration: int = 1800) -> None:
         if self._stop_event.is_set() or elapsed_seconds >= max_duration:
             return
@@ -810,6 +841,11 @@ class Auctions(dict):
         self._my_simulator.create_random_auctions(self, current_user_id)
 
         self._my_simulator.randomly_rate_users(self._users, current_user_id)
+
+        # Der Simulator kennt den Heap nicht, daher nach den Bewertungen die Einträge abgleichen.
+        # update_bidders() ist bei unveränderter Sternezahl ein No-op, bewegt also nur geänderte Benutzer.
+        for user_id in list(self._users.keys()):
+            self._update_user_rating(user_id)
 
         next_elapsed = elapsed_seconds + 30
         if next_elapsed < max_duration:
@@ -831,10 +867,10 @@ class Auctions(dict):
             self._heap.remove(auction_id)
 
         if purchaser_id is not None and purchaser_id != "Kein Bieter":
-            self._transactions.insert(Transaction(seller=self._users[seller_id].name(), 
-                                                  buyer=self._users[purchaser_id].name(), 
-                                                  price=highest_bid, 
-                                                  timestamp=datetime.now(), 
+            self._transactions.insert(Transaction(seller=self._users[seller_id].name(),
+                                                  buyer=self._users[purchaser_id].name(),
+                                                  price=highest_bid,
+                                                  timestamp=datetime.now(),
                                                   product_name=self[auction_id].get_item_name()))
 
         # purchaser_id kann auch "Kein Bieter" oder None sein.
