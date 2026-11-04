@@ -16,6 +16,7 @@ Passwortüberprüfung, Freundschaftsempfehlung, Abstands- und Verbindungsberechn
 
 from typing import Any, Dict, List, Optional, Tuple, Union
 import ast
+from collections import deque
 import csv
 import marketplace.user
 import marketplace.praktikumsgruppen
@@ -219,52 +220,134 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
 
     def suggest_friends(self, user_id: str, num_common_friends: int = 2,
                         distance_threshold: float = 0.1, pretty_print: bool = True) -> List[str]:
-        """Suggests users to the given user_id that
-        (1) are friends with at least num_common_friends friends of user_id or
-        (2) that live nearby the given user_id (closer as distance_threshold) and are friends of friends of friends...
-        (see are_users_connected())
+        """
+        Suggests users to the given user_id based on mutual friends and geographic proximity.
+
+        Author:
+            CallMeMosaic
+
+        Recommendations are generated in two distinct prioritized parts:
+        (1) Common friends: Users who are friends with at least `num_common_friends` of the target user's direct friends,
+            ordered descending by the number of mutual connections.
+        (2) Nearby connected friends: Users living within `distance_threshold` who are reachable via the social network
+            graph (see `are_users_connected`), ordered ascending by geographic distance.
 
         Args:
-            user_id (str): usually the current user id
-            num_common_friends (int): only suggest users that are at least friends with two of the user_ids friends
-            distance_threshold (float): only suggest users that live closer to the given user_id as this threshold value
-            pretty_print (bool): if True, then call pretty_print() on all suggested friends before returning them
+            user_id (str): GM-ID of the user for whom suggestions should be generated.
+            num_common_friends (int): Minimum number of shared friends required for mutual friend recommendations. Defaults to 2.
+            distance_threshold (float): Maximum geographic distance for nearby friend recommendations. Defaults to 0.1.
+            pretty_print (bool): If True, returns formatted display strings for each user; otherwise returns user IDs. Defaults to True.
 
         Returns:
-            List[str]: list of suggested friends. the first part of the list should contain common friends, ordered so that users with maximum number of common friends appear first. the second part of the list should contain all users that live close by, again sorted, so that the direct neighbour comes first.
+            List[str]: Combined list of suggested friend identifiers or pretty-printed strings,
+                       with top mutual connections first followed by closest nearby connected users.
 
         Raises:
-            KeyError: Falls `user_id` nicht existiert.
+            KeyError: If `user_id` does not exist in the user database.
         """
+
+        # Step 1: Compute frequencies of mutual friends (friends of friends)
         mutual_friends_count = self.get_mutual_friends(user_id)
-        # TODO for students: Implement this method by filling the list suggested_friends
 
-        suggested_friends = []
+        # Step 2: Filter and sort candidates with sufficient mutual friends (Part 1)
+        # Select candidates having at least `num_common_friends` shared connections
+        common_friends = [
+            friend_id for friend_id, count in mutual_friends_count.items()
+            if count >= num_common_friends
+                        ]
 
+        # Sort candidates in descending order of mutual friend count (highest overlap first)
+        common_friends.sort(key=lambda fid: mutual_friends_count[fid], reverse=True)
+
+        # Step 3: Identify nearby connected candidates in the network (Part 2)
+        # Retrieve direct friends and keep a set of already suggested users to prevent duplicates
+        direct_friends = self[user_id].friends()
+        suggested_set = set(common_friends)
+
+        nearby_candidates: List[Tuple[str, float]] = []
+        for other_id in self:
+            # Exclude self, existing direct friends, and users already added in part 1
+            if other_id == user_id or other_id in direct_friends or other_id in suggested_set:
+                continue
+
+            # Calculate physical/GPS distance between target user and candidate
+            dist = self.calc_distance_between_users(user_id, other_id)
+
+            # Check if candidate is geographically close and connected in the friendship graph
+            if dist < distance_threshold:
+                if self.are_users_connected(user_id, other_id):
+                    nearby_candidates.append((other_id, dist))
+
+        # Sort nearby candidates in ascending order by distance (closest neighbor first)
+        nearby_candidates.sort(key=lambda item: item[1])
+        nearby_friends = [other_id for other_id, _ in nearby_candidates]
+
+        # Step 4: Concatenate both prioritized recommendation lists
+        suggested_friends = common_friends + nearby_friends
+
+        # Step 5: Format output if pretty-printing is requested
         if pretty_print:
             suggested_friends = [self[friend].pretty_print() for friend in suggested_friends]
 
         return suggested_friends
 
     def are_users_connected(self, user_id1: str, user_id2: str, degree: int = 3) -> bool:
-        """Prüft mittels Breitensuche, ob zwei Benutzer über Freundschaftskanten verbunden sind.
+        """
+        Determines whether two users are connected in the friendship network up to a given degree.
+
+        Author:
+            CallMeMosaic
+
+        Traverses the friendship graph using Breadth-First Search (BFS) to identify whether
+        a connection path exists between `user_id1` and `user_id2` within `degree` steps.
 
         Args:
-            user_id1 (str): a user that we are searching a friend for
-            user_id2 (str): another user, where we want to check whether it is somehow friends with user_id1 over some other shared friends
-            degree (int): only look for possible friend connections up to this degree of friendship. Defaults to 3.
+            user_id1 (str): GM-ID of the starting user.
+            user_id2 (str): GM-ID of the target user.
+            degree (int): Maximum allowable friendship degree (path length). Defaults to 3.
 
         Returns:
-            bool: True, if user_id1 and user_id2 are friends over some edges up to the given degree, else False
+            bool: True if a path of length <= degree exists between the users, False otherwise.
 
         Raises:
             None
         """
+
+        # Validate that both user IDs exist in the user database
         if user_id1 not in self or user_id2 not in self:
             return False
 
-        # TODO for students: Implement this method
+        # Negative degrees are invalid for network traversal
+        if degree < 0:
+            return False
 
+        # A user is connected to themselves at degree 0 or higher
+        if user_id1 == user_id2:
+            return True
+
+        # Initialize BFS queue with (current_user_id, current_degree) and track visited users
+        queue = deque([(user_id1, 0)])
+        visited = {user_id1}
+
+        # Perform Breadth-First Search exploration
+        while queue:
+            current, d = queue.popleft()
+
+            # Expand neighbors only if we have not reached the maximum exploration depth
+            if d < degree:
+                if current in self:
+                    # Explore all immediate friends of the current user
+                    for neighbor in self[current].friends():
+                        # Target found within the allowed degree
+                        if neighbor == user_id2:
+                            return True
+
+                        # Enqueue unvisited neighbors for the next layer of BFS traversal
+                        if neighbor not in visited and neighbor in self:
+                            visited.add(neighbor)
+                            queue.append((neighbor, d + 1))
+
+        # No connection path found within the specified degree
         return False
 
     # *** PUBLIC STATIC methods ***
