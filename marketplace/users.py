@@ -18,8 +18,14 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import ast
 from collections import deque
 import csv
+
+from scipy.optimize import check_grad
+
 import marketplace.user
 import marketplace.praktikumsgruppen
+
+import networkx as nx
+import osmnx as ox
 
 
 class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
@@ -40,6 +46,8 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
         _groupnumbers (List[int]): Liste der Gruppennummern der eingelesenen Benutzer.
     """
 
+    map_graph = None
+
     # *** CONSTRUCTORS ***
     def __init__(self, csvfile: str, *args: Any) -> None:
         """Initialisiert das Users-Objekt und liest Daten aus CSV-Dateien ein.
@@ -58,6 +66,8 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
 
         # erstelle Praktikumsgruppen als Menge disjunkter Mengen bzw. als dictionary (1. und 2. Praktikum)
         super().create_groups(list(self.keys()), self._groupnumbers)
+
+        self.load_graph()
 
     # *** PUBLIC SET methods ***
 
@@ -83,6 +93,14 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
             address (str, optional): Address string corresponding to GPS coordinates. Defaults to "".
         """
         self[user_id] = marketplace.user.User(user_id, password, name_family, name_first, gps_coord, address)
+
+    def load_graph(self):
+        if self.map_graph is None:
+            map_graph = ox.graph.graph_from_address(
+                'Steinmüllerallee 1, Gummersbach, Germany', dist=5000, network_type='drive')
+            ox.save_graph_xml(map_graph, "./map_graph.xml")
+
+        self.map_graph = ox.load_graphml("./map_graph.xml")
 
     def calc_distance_between_users(self, user_id1: str, user_id2: str) -> float:
         """Calculates distance between GPS coordinates of two users.
