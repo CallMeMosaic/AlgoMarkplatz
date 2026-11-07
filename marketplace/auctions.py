@@ -71,6 +71,9 @@ class Auctions(dict):
         super().__init__(self)
 
         self._id_next_auction: int = 0
+        self._stop_event: threading.Event = threading.Event()
+        self._system_messages: Optional[Any] = None
+        self._last_top_auction: Optional[Tuple[int, str, float]] = None
 
         # für erstes Praktikum auf None setzen und für 2. Praktikum auf MaxHeap()
         try:
@@ -100,15 +103,12 @@ class Auctions(dict):
 
         self._my_simulator: marketplace.simulator.Simulator = marketplace.simulator.Simulator()
 
-        self._stop_event: threading.Event = threading.Event()
-        self._system_messages: Optional[Any] = None
-
         # self._start_simulator()
 
     # *** PUBLIC SET methods ***
 
     def set_system_messages(self, system_messages: Any) -> None:
-        """Setzt das Objekt für Systemnachrichten.
+        """Setzt das Objekt für Systemnachrichten und stößt eine initiale Aktualisierung an.
 
         Args:
             system_messages (Any): Die SystemMessages-Instanz.
@@ -120,6 +120,8 @@ class Auctions(dict):
             None
         """
         self._system_messages = system_messages
+        # Sobald die Systemnachrichten-Instanz verknüpft ist, initial die führende Top-Auktion anzeigen
+        self._update_top_auction_message()
 
     # *** PUBLIC methods ***
 
@@ -150,6 +152,10 @@ class Auctions(dict):
     def bid_in_auction(self, auction_id: str, user: Any, bid_amount: float) -> bool:
         """Gibt ein Gebot für die angegebene Auktions-ID ab.
 
+        Aktualisiert bei erfolgreichem Gebot den Max-Heap und prüft, ob sich die
+        Top-Auktion (Auktion mit den meisten Geboten) geändert hat, um diese
+        unmittelbar als Systemnachricht auszugeben (ereignisbasiert statt im festen Zeitintervall).
+
         Args:
             auction_id (str): Auktions-ID.
             user (Any): Der bietende Benutzer.
@@ -165,6 +171,8 @@ class Auctions(dict):
             success = self[auction_id].bid(user, float(bid_amount))
             if success and self._heap is not None:
                 self._heap.update_bidders(auction_id, self[auction_id].bid_count())
+                # Top-Auktion sofort bei Gebotsänderungen aktualisieren und ggf. Systemnachricht senden
+                self._update_top_auction_message()
             return bool(success)
         return False
 
@@ -235,6 +243,7 @@ class Auctions(dict):
         super().__delitem__(key)
         if self._heap is not None:
             self._heap.remove(key)
+            self._update_top_auction_message()
 
     # wird bei self[auction_id] = auction aufgerufen
     def __setitem__(self, key: str, value: marketplace.auction.Auction) -> None:
@@ -528,7 +537,7 @@ class Auctions(dict):
         """
         return self[auction_id].get_bid_of_user(user_id)
 
-    def get_last_bid(self, auction_id: str) -> Optional[Tuple[str, float]]:
+    def get_last_bid(self, auction_id: str) -> Optional[uple[str, float]]:
         """Gibt das letzte Gebot auf den Stapel der Auktion zurück.
 
         Args:
@@ -832,6 +841,44 @@ class Auctions(dict):
         else:
             self._heap_users_rated.update_bidders(user_id, stars_mean)
 
+    def _update_top_auction_message(self) -> None:
+        """Prüft, ob sich die aktivste Top-Auktion geändert hat, und gibt eine Systemnachricht aus.
+
+        Wird ereignisbasiert aufgerufen (z. B. nach jedem Gebot oder bei Beendigung/Löschung einer
+        Auktion), damit die Information über die Auktion mit den meisten Geboten sofort und ohne
+        Verzögerung aktualisiert wird, anstatt auf ein festes Zeitintervall zu warten.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        # Wenn kein Benachrichtigungssystem oder kein Heap vorliegt, wird abgebrochen
+        if self._system_messages is None or self._heap is None:
+            return
+
+        # Top-Auktion aus dem Max-Heap in O(1) abfragen
+        top_auction = self.get_top_auction(True)
+        if top_auction is not None:
+            bid_count, auction_id = top_auction
+            # Nur benachrichtigen, wenn bereits Gebote vorliegen
+            if bid_count > 0:
+                highest_bid = self.get_highest_bid(auction_id)
+                top_state = (bid_count, auction_id, highest_bid)
+                # Nur senden, wenn sich der Zustand der Top-Auktion tatsächlich geändert hat
+                if top_state != self._last_top_auction:
+                    self._last_top_auction = top_state
+                    item_name = self.get_item_name(auction_id)
+                    self._system_messages.push(
+                        "Die TOP Auktion mit {0} Geboten ist Auktion {1} in der man ein {2} für aktuell {3} € ersteigern kann.".format(
+                            bid_count, auction_id, item_name, highest_bid
+                        )
+                    )
+
     def _start_simulator(self, current_user_id: str, elapsed_seconds: int = 0, max_duration: int = 1800) -> None:
         if self._stop_event.is_set() or elapsed_seconds >= max_duration:
             return
@@ -865,6 +912,7 @@ class Auctions(dict):
 
         if self._heap is not None:
             self._heap.remove(auction_id)
+            self._update_top_auction_message()
 
         if purchaser_id is not None and purchaser_id != "Kein Bieter":
             self._transactions.insert(Transaction(seller=self._users[seller_id].name(),

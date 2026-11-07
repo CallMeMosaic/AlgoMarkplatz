@@ -44,6 +44,9 @@ class AuctionApp(AuctionAppInit):
         """Prüft abgelaufene Auktionen, pusht Systemnachrichten und aktualisiert alle Listboxen.
 
         Diese Methode wird alle 30 Sekunden über `root.after` erneut aufgerufen.
+        Hinweis: Die Top-Auktion mit den meisten Geboten wird nun ereignisbasiert direkt
+        bei Änderungen in `marketplace.auctions.Auctions` als Systemnachricht aktualisiert
+        und nicht mehr in einem festen Zeitintervall.
 
         Args:
             None
@@ -52,15 +55,6 @@ class AuctionApp(AuctionAppInit):
             None
         """
         self._check_auctions_expiry()
-
-        top_auction = self._auctions.get_top_auction(True)
-
-        if top_auction is not None:
-            self.system_messages.push(
-                "Die TOP Auktion mit {0} Geboten ist Auktion {1} in der man ein {2} für aktuell {3} € ersteigern kann.".format(
-                    top_auction[0], top_auction[1], self._auctions.get_item_name(top_auction[1]),
-                    self._auctions.get_highest_bid(top_auction[1])
-                ))
 
         top_user = self._auctions.get_top_rated_user(True)
 
