@@ -18,6 +18,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import ast
 from collections import deque
 import csv
+import math
+from pathlib import Path
 
 from scipy.optimize import check_grad
 
@@ -67,7 +69,7 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
         # erstelle Praktikumsgruppen als Menge disjunkter Mengen bzw. als dictionary (1. und 2. Praktikum)
         super().create_groups(list(self.keys()), self._groupnumbers)
 
-        self.load_graph()
+        # Der Straßengraph wird erst für eine gültige Distanzabfrage geladen.
 
     # *** PUBLIC SET methods ***
 
@@ -94,34 +96,100 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
         """
         self[user_id] = marketplace.user.User(user_id, password, name_family, name_first, gps_coord, address)
 
-    def load_graph(self):
-        if self.map_graph is None:
+    def load_graph(self) -> None:
+        """Lädt den Fahrstraßengraphen einmalig aus GraphML oder von OpenStreetMap.
+
+        Ein bereits gesetzter Graph wird unverändert weiterverwendet. Ohne Cache
+        wird wie im Projektbeispiel das Gebiet um Gummersbach (dist=5000) geladen.
+        Download- und Dateifehler werden an den Aufrufer weitergegeben.
+        """
+        if self.map_graph is not None:
+            return
+
+        # GraphML erhält Kantenlängen und parallele Straßen; OSM-XML ist kein GraphML.
+        graph_path = Path('map_graph.graphml')
+        if graph_path.is_file():
+            self.map_graph = ox.load_graphml(graph_path)
+        else:
             map_graph = ox.graph.graph_from_address(
                 'Steinmüllerallee 1, Gummersbach, Germany', dist=5000, network_type='drive')
-            ox.save_graph_xml(map_graph, "./map_graph.xml")
-
-        self.map_graph = ox.load_graphml("./map_graph.xml")
+            ox.save_graphml(map_graph, graph_path)
+            self.map_graph = map_graph
 
     def calc_distance_between_users(self, user_id1: str, user_id2: str) -> float:
-        """Calculates distance between GPS coordinates of two users.
+        """Berechnet die kürzeste Fahrstrecke im geladenen Straßennetz.
+
+        Die GPS-Punkte werden auf die nächsten Straßenknoten abgebildet; Wege
+        vom Wohnort zu diesen Knoten zählen nicht mit. Einbahnstraßen werden
+        berücksichtigt, daher können Hin- und Rückweg verschieden lang sein.
+        Der Standardgraph deckt nur Gummersbach ab, nicht ganz NRW. Auch Punkte
+        außerhalb werden auf diesen Graphen abgebildet; für solche Wohnorte
+        muss ein ausreichend großer Graph als map_graph bereitgestellt werden.
 
         Args:
-            user_id1 (str): First user ID.
-            user_id2 (str): Second user ID.
+            user_id1: ID des ersten Benutzers
+            user_id2: ID des zweiten Benutzers
 
         Returns:
-            float: Calculated distance between the two users.
+            float: Minimale Summe der Straßenkantenlängen in Metern.
+                  Gibt unendlich zurück, falls Benutzer oder gültige Koordinaten
+                  fehlen oder kein gerichteter Pfad gefunden wird.
         """
-        # TODO for students: calculate distance between gps coordinates of user1 and user2 using a map and an
-        #  algorithm that calculates the shortest distance on the map
+        if user_id1 not in self or user_id2 not in self:
+            return float('inf')
 
         user1 = self[user_id1]
         user2 = self[user_id2]
 
-        # TODO for students: replace this naive implementation of manhattan distance with distance gotten
-        #  from graph algorithm
-        distance = sum(abs(a - b) for a, b in zip(user1.gps_coords(), user2.gps_coords()))
-        return float(distance)
+        # GPS-Koordinaten abrufen (Breitengrad, Längengrad)
+        origin_point = user1.gps_coords()  # (lat, lon)
+        destination_point = user2.gps_coords()  # (lat, lon)
+
+        # Fehlende oder ungültige GPS-Daten vor Graphzugriff und Knotensuche abfangen.
+        for point in (origin_point, destination_point):
+            try:
+                if (point is None or len(point) != 2
+                        or not all(math.isfinite(value) for value in point)
+                        or not (-90 <= point[0] <= 90 and -180 <= point[1] <= 180)):
+                    return float('inf')
+            except (TypeError, ValueError):
+                return float('inf')
+
+        self.load_graph()
+
+        try:
+            # Nächste Knoten im Graphen finden (nearest_nodes erwartet lon, lat)
+            origin = ox.distance.nearest_nodes(
+                self.map_graph,
+                origin_point[1],  # Längengrad
+                origin_point[0]   # Breitengrad
+            )
+            destination = ox.distance.nearest_nodes(
+                self.map_graph,
+                destination_point[1],
+                destination_point[0]
+            )
+
+            # Kürzesten Pfad berechnen
+            shortest_path = ox.routing.shortest_path(
+                self.map_graph,
+                origin,
+                destination,
+                weight='length'
+            )
+            # OSMnx liefert bei nicht erreichbarem Ziel None statt einer Knotenliste.
+            if shortest_path is None:
+                return float('inf')
+
+            # Bei parallelen Kanten zählt wie bei der Routensuche die kürzeste Kante.
+            distance_m = nx.path_weight(self.map_graph, shortest_path, weight='length')
+            return float(distance_m)
+
+        except (nx.NetworkXNoPath, ValueError) as e:
+            # Beispielsweise getrennte Komponenten oder ein leerer Graph.
+            print(f"Warnung: Kein Pfad zwischen {user_id1} und {user_id2} gefunden: {e}")
+            return float('inf')
+
 
     # *** PUBLIC GET methods ***
 
@@ -237,7 +305,7 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
         return mutual_friends_count
 
     def suggest_friends(self, user_id: str, num_common_friends: int = 2,
-                        distance_threshold: float = 0.1, pretty_print: bool = True) -> List[str]:
+                        distance_threshold: float = 10000.0, pretty_print: bool = True) -> List[str]:
         """
         Suggests users to the given user_id based on mutual friends and geographic proximity.
 
@@ -253,7 +321,8 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
         Args:
             user_id (str): GM-ID of the user for whom suggestions should be generated.
             num_common_friends (int): Minimum number of shared friends required for mutual friend recommendations. Defaults to 2.
-            distance_threshold (float): Maximum geographic distance for nearby friend recommendations. Defaults to 0.1.
+            distance_threshold (float): Maximum driving distance in meters for nearby friend recommendations.
+                Defaults to 10000 (10 km); this is a road-distance cutoff, not a coordinate difference in degrees.
             pretty_print (bool): If True, returns formatted display strings for each user; otherwise returns user IDs. Defaults to True.
 
         Returns:
@@ -288,7 +357,7 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
             if other_id == user_id or other_id in direct_friends or other_id in suggested_set:
                 continue
 
-            # Calculate physical/GPS distance between target user and candidate
+            # Calculate driving distance in meters between target user and candidate
             dist = self.calc_distance_between_users(user_id, other_id)
 
             # Check if candidate is geographically close and connected in the friendship graph
