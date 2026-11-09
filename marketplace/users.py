@@ -107,12 +107,23 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
             return
 
         # GraphML erhält Kantenlängen und parallele Straßen; OSM-XML ist kein GraphML.
-        graph_path = Path('map_graph.graphml')
+        graph_path = Path('nrw_map_graph.graphml')
         if graph_path.is_file():
             self.map_graph = ox.load_graphml(graph_path)
         else:
-            map_graph = ox.graph.graph_from_address(
-                'Steinmüllerallee 1, Gummersbach, Germany', dist=5000, network_type='drive')
+            filter = '["highway"~"motorway|motorway_link|trunk|trunk_link|primary|primary_link"|secondary|secondary_link]'
+            # Explanation:
+            """
+            This filters for motorways (which are Autobahnen), trunk roads (which are like some bundesstraßen), primary road
+            (whihc most bundesstraßen are labeled as on OSM) and their corresponding linkages so that a route can be established.
+            Anything small is left out for loading time and size of the graph.
+            """
+
+            map_graph = ox.graph.graph_from_place(
+                'North Rhine-Westphalia',
+                network_type='drive',
+                custom_filter=filter
+            )
             ox.save_graphml(map_graph, graph_path)
             self.map_graph = map_graph
 
