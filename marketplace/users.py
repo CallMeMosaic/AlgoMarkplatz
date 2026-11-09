@@ -111,7 +111,7 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
         if graph_path.is_file():
             self.map_graph = ox.load_graphml(graph_path)
         else:
-            filter = '["highway"~"motorway|motorway_link|trunk|trunk_link|primary|primary_link"|secondary|secondary_link]'
+            filter = '["highway"~"motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link"]'
             # Explanation:
             """
             This filters for motorways (which are Autobahnen), trunk roads (which are like some bundesstraßen), primary road
@@ -133,7 +133,7 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
         Die GPS-Punkte werden auf die nächsten Straßenknoten abgebildet; Wege
         vom Wohnort zu diesen Knoten zählen nicht mit. Einbahnstraßen werden
         berücksichtigt, daher können Hin- und Rückweg verschieden lang sein.
-        Der Standardgraph deckt nur Gummersbach ab, nicht ganz NRW. Auch Punkte
+        Der Standardgraph deckt nur NRW ab, nicht ganz NRW. Auch Punkte
         außerhalb werden auf diesen Graphen abgebildet; für solche Wohnorte
         muss ein ausreichend großer Graph als map_graph bereitgestellt werden.
 
@@ -316,9 +316,10 @@ class Users(marketplace.praktikumsgruppen.Praktikumsgruppen):
         return mutual_friends_count
 
     def suggest_friends(self, user_id: str, num_common_friends: int = 2,
-                        distance_threshold: float = 10000.0, pretty_print: bool = True) -> List[str]:
+                        distance_threshold: float = 30000.0, pretty_print: bool = True) -> List[str]:
         """
         Suggests users to the given user_id based on mutual friends and geographic proximity.
+        Changed distance to 30km since 10km in road distance is non representative, as air distance could be much shorter, therefore 30km yields better results.
 
         Author:
             CallMeMosaic
